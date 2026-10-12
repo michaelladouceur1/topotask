@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ..node import Node, NodeParams
-from ..registry import register
+from topo.node import Node, NodeParams
+from topo.registry import register
 
 
 @register("sim.warp")

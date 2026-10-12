@@ -1,23 +1,73 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "topo"
 version = "0.1.0"
+description = "Composable DAG pipelines for robotics and simulation: Pydantic-validated YAML configs, a small threaded executor, and an optional FastAPI server."
+readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["pydantic>=2.5", "omegaconf>=2.3", "fastapi>=0.110", "uvicorn>=0.27"]
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+  { name = "michaelladouceur", email = "michaelladouceur1@gmail.com" },
+]
+keywords = [
+  "robotics",
+  "simulation",
+  "motion-planning",
+  "pipeline",
+  "dag",
+  "workflow",
+  "orchestration",
+  "pydantic",
+  "omegaconf",
+  "fastapi",
+]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
+  "Typing :: Typed",
+]
+dependencies = [
+  "pydantic>=2.5",
+  "omegaconf>=2.3",
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+]
 
 [project.optional-dependencies]
-gpu = ["warp-lang"]          # cuRobo is installed from source; see Dockerfile
-dev = ["pytest", "httpx"]
+gpu = ["warp-lang"]          # cuRobo is installed from source; see examples/Dockerfile
+dev = ["pytest>=7", "httpx"]
+
+[project.scripts]
+topo = "topo.__main__:main"
 
 # Third-party packages can ship nodes without touching core:
 # [project.entry-points."topo.nodes"]
 # my_nodes = "my_pkg.nodes"
 
+[project.urls]
+Homepage = "https://github.com/michaelladouceur/topo"
+Repository = "https://github.com/michaelladouceur/topo"
+Issues = "https://github.com/michaelladouceur/topo/issues"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["topo*"]
+
+[tool.setuptools.package-data]
+topo = ["py.typed"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "examples/tests"]
+pythonpath = ["."]

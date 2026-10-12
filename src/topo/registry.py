@@ -1,6 +1,8 @@
-"""Decorator-based node registry + entry-point plugin loading."""
+"""Decorator-based node registry + plugin loading."""
 from __future__ import annotations
 
+import importlib
+import os
 from importlib.metadata import entry_points
 
 _REGISTRY: dict[str, type] = {}
@@ -24,7 +26,20 @@ def get_node_class(type_name: str) -> type:
 
 
 def load_plugins() -> None:
-    """Import built-in nodes and any third-party `topo.nodes` entry points."""
-    from . import nodes  # noqa: F401  (registers built-ins on import)
+    """Import modules that register node types (`topo` ships with none built in).
+
+    Two optional mechanisms:
+
+    - ``TOPO_PLUGINS``: a comma-separated list of importable module names. Handy
+      for local projects and examples that are not installed as a package.
+    - the ``topo.nodes`` entry-point group, the distributable path::
+
+          [project.entry-points."topo.nodes"]
+          my_nodes = "my_pkg.nodes"
+    """
+    for module in os.environ.get("TOPO_PLUGINS", "").split(","):
+        module = module.strip()
+        if module:
+            importlib.import_module(module)
     for ep in entry_points(group="topo.nodes"):
         ep.load()
