@@ -531,7 +531,7 @@ wheels = [
 ]
 
 [[package]]
-name = "topo"
+name = "topotask"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

@@ -1,4 +1,4 @@
-"""Run a pipeline once from the command line: ``python -m topo <config.yaml>``."""
+"""Run a pipeline once from the command line: ``python -m topotask <config.yaml>``."""
 from __future__ import annotations
 
 import argparse
@@ -10,8 +10,8 @@ from .executor import Pipeline
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(
-        prog="topo",
-        description="Run a topo pipeline once.",
+        prog="topotask",
+        description="Run a topotask pipeline once.",
         epilog="Overrides are OmegaConf dot-list assignments, e.g. "
                "nodes.plan.params.max_attempts=8",
     )

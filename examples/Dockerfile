@@ -1,6 +1,6 @@
-# Example image: CUDA + PyTorch + the topo example pipelines.
+# Example image: CUDA + PyTorch + the topotask example pipelines.
 # Build from the repository root:
-#   docker build -f examples/Dockerfile -t topo-examples .
+#   docker build -f examples/Dockerfile -t topotask-examples .
 FROM nvcr.io/nvidia/pytorch:24.05-py3
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN pip install warp-lang
 COPY examples ./examples
 
 # Register the example nodes, then point the server at the example pipelines.
-ENV TOPO_PLUGINS=examples.nodes
+ENV TOPOTASK_PLUGINS=examples.nodes
 ENV PIPELINE_DIR=/app/examples/configs/pipelines
 EXPOSE 8000
-CMD ["uvicorn", "topo.server:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "topotask.server:app", "--host", "0.0.0.0", "--port", "8000"]

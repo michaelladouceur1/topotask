@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "topo"
+name = "topotask"
 version = "0.1.0"
 description = "Composable DAG pipelines for robotics and simulation: Pydantic-validated YAML configs, a small threaded executor, and an optional FastAPI server."
 readme = "README.md"
@@ -49,23 +49,23 @@ dependencies = [
 dev = ["pytest>=7", "httpx"]
 
 [project.scripts]
-topo = "topo.__main__:main"
+topotask = "topotask.__main__:main"
 
 # Third-party packages can ship nodes without touching core:
-# [project.entry-points."topo.nodes"]
+# [project.entry-points."topotask.nodes"]
 # my_nodes = "my_pkg.nodes"
 
 [project.urls]
-Homepage = "https://github.com/michaelladouceur/topo"
-Repository = "https://github.com/michaelladouceur/topo"
-Issues = "https://github.com/michaelladouceur/topo/issues"
+Homepage = "https://github.com/michaelladouceur/topotask"
+Repository = "https://github.com/michaelladouceur/topotask"
+Issues = "https://github.com/michaelladouceur/topotask/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["topo*"]
+include = ["topotask*"]
 
 [tool.setuptools.package-data]
-topo = ["py.typed"]
+topotask = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "examples/tests"]

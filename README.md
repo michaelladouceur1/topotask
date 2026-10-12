@@ -1,9 +1,9 @@
-# topo
+# topotask
 
 Composable DAG pipelines for robotics and simulation: **Pydantic-validated YAML
 configs, a small threaded executor, and an optional FastAPI server**.
 
-`topo` is a *framework*, not a library of steps. It decides how nodes are
+`topotask` is a *framework*, not a library of steps. It decides how nodes are
 configured, ordered, validated, and run; you provide the nodes. That keeps it
 usable in any project — and safe to publish, since nothing implementation
 specific is baked in.
@@ -21,31 +21,31 @@ specific is baked in.
   any expensive (GPU) work starts.
 - **Optional server.** FastAPI loads and warms every pipeline at startup.
 
-`topo` ships with **no built-in nodes**. Implementation-specific nodes (a motion
+`topotask` ships with **no built-in nodes**. Implementation-specific nodes (a motion
 planner, a simulator, scene I/O, ...) live in [`examples/`](examples) as a
 pattern to copy. See [`examples/README.md`](examples/README.md).
 
 ## Install
 
 ```bash
-pip install topo
+pip install topotask
 ```
 
 Optional extras:
 
 ```bash
-pip install "topo[dev]"    # pytest, httpx
+pip install "topotask[dev]"    # pytest, httpx
 ```
 
 Anything GPU-related (a specific planner, simulator, etc.) is supplied by the
-packages that provide those nodes, not by `topo` itself.
+packages that provide those nodes, not by `topotask` itself.
 
 ## Quick start
 
 Register a node, describe a pipeline, run it:
 
 ```python
-from topo import Node, NodeParams, Pipeline, PipelineSpec, register
+from topotask import Node, NodeParams, Pipeline, PipelineSpec, register
 
 
 @register("math.double")
@@ -91,15 +91,15 @@ outputs:
 ```
 
 ```bash
-python -m topo demo.yaml --inputs '{"x": 14}' nodes.d.params.factor=10
-# or, once installed:  topo demo.yaml --inputs '{"x": 14}'
+python -m topotask demo.yaml --inputs '{"x": 14}' nodes.d.params.factor=10
+# or, once installed:  topotask demo.yaml --inputs '{"x": 14}'
 ```
 
 ## Running the examples
 
 [`examples/`](examples) is a complete, runnable project to copy from:
 implementation-specific nodes (planner, simulator, scene I/O), a demo pipeline,
-its tests, and a Dockerfile. None of it is part of the `topo` wheel.
+its tests, and a Dockerfile. None of it is part of the `topotask` wheel.
 
 Install the project with its dev dependencies from the repository root:
 
@@ -107,24 +107,24 @@ Install the project with its dev dependencies from the repository root:
 pip install -e ".[dev]"
 ```
 
-The example nodes are not installed as a package, so `topo` must be told where
-to import them from. The `TOPO_PLUGINS` environment variable does that (see
+The example nodes are not installed as a package, so `topotask` must be told where
+to import them from. The `TOPOTASK_PLUGINS` environment variable does that (see
 [Plugins](#plugins) below), and the `python -m ...` form puts the repository
 root on `sys.path`:
 
 ```bash
 # Run the demo pipeline once. A reachable goal takes the "export" branch:
-TOPO_PLUGINS=examples.nodes python -m topo \
+TOPOTASK_PLUGINS=examples.nodes python -m topotask \
     examples/configs/pipelines/plan_and_simulate.yaml \
     --inputs '{"goal":[0.3,0.2,0.4]}'
 
 # A colliding goal takes the "inflate" fallback branch instead:
-TOPO_PLUGINS=examples.nodes python -m topo \
+TOPOTASK_PLUGINS=examples.nodes python -m topotask \
     examples/configs/pipelines/plan_and_simulate.yaml \
     --inputs '{"goal":[0.3,0.2,0.05]}'
 
 # Override any value with an OmegaConf dot-list:
-TOPO_PLUGINS=examples.nodes python -m topo \
+TOPOTASK_PLUGINS=examples.nodes python -m topotask \
     examples/configs/pipelines/plan_and_simulate.yaml \
     --inputs '{"goal":[0.3,0.2,0.4]}' nodes.simulate.params.min_clearance=0.5
 ```
@@ -139,8 +139,8 @@ pytest examples/tests  # just the examples
 Serve the example pipelines with the FastAPI app:
 
 ```bash
-TOPO_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
-    python -m uvicorn topo.server:app
+TOPOTASK_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
+    python -m uvicorn topotask.server:app
 # GET  /pipelines
 # POST /pipelines/plan_and_simulate/run   {"inputs": {"goal": [0.3, 0.2, 0.4]}}
 ```
@@ -148,7 +148,7 @@ TOPO_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
 Build the example container (from the repository root):
 
 ```bash
-docker build -f examples/Dockerfile -t topo-examples .
+docker build -f examples/Dockerfile -t topotask-examples .
 ```
 
 See [`examples/README.md`](examples/README.md) for a breakdown of each node.
@@ -196,19 +196,19 @@ nodes:
 ## Plugins
 
 Third-party packages can ship nodes without touching core. Advertise them with
-an entry point, and `topo` imports them whenever a `Pipeline` is constructed:
+an entry point, and `topotask` imports them whenever a `Pipeline` is constructed:
 
 ```toml
-[project.entry-points."topo.nodes"]
+[project.entry-points."topotask.nodes"]
 my_nodes = "my_pkg.nodes"
 ```
 
 For projects that are not installed as a package (local scripts, the examples
 here — see [Running the examples](#running-the-examples)), list modules in the
-`TOPO_PLUGINS` environment variable instead:
+`TOPOTASK_PLUGINS` environment variable instead:
 
 ```bash
-TOPO_PLUGINS=my_project.nodes python -m topo my_pipeline.yaml
+TOPOTASK_PLUGINS=my_project.nodes python -m topotask my_pipeline.yaml
 ```
 
 Importing a module that uses `@register(...)` is all it takes — registration is
@@ -218,7 +218,7 @@ run from the project root, use `python -m ...`, or set `PYTHONPATH`.
 ## Server
 
 ```bash
-PIPELINE_DIR=configs/pipelines uvicorn topo.server:app
+PIPELINE_DIR=configs/pipelines uvicorn topotask.server:app
 # GET  /pipelines
 # POST /pipelines/{name}/run   {"inputs": {...}}
 ```
@@ -228,17 +228,17 @@ warmed at startup; a bad config fails the process immediately.
 
 ## Layout
 
-| Path                       | Role                                                                 |
-| -------------------------- | -------------------------------------------------------------------- |
-| `src/topo/config.py`       | Pydantic schema for pipeline YAML; OmegaConf loading + overrides     |
-| `src/topo/node.py`         | `Node` base class: `Params`, declared `outputs`, lifecycle hooks     |
-| `src/topo/registry.py`     | `@register("type.name")` + entry-point / `TOPO_PLUGINS` loading      |
-| `src/topo/executor.py`     | `graphlib` ordering + `ThreadPoolExecutor`; `when:` branches         |
-| `src/topo/server.py`       | FastAPI; loads + warms all pipelines at startup                      |
-| `src/topo/__main__.py`     | `topo` CLI: run one pipeline from the command line                   |
+| Path                       | Role                                                                     |
+| -------------------------- | ------------------------------------------------------------------------ |
+| `src/topotask/config.py`   | Pydantic schema for pipeline YAML; OmegaConf loading + overrides         |
+| `src/topotask/node.py`     | `Node` base class: `Params`, declared `outputs`, lifecycle hooks         |
+| `src/topotask/registry.py` | `@register("type.name")` + entry-point / `TOPOTASK_PLUGINS` loading      |
+| `src/topotask/executor.py` | `graphlib` ordering + `ThreadPoolExecutor`; `when:` branches             |
+| `src/topotask/server.py`   | FastAPI; loads + warms all pipelines at startup                          |
+| `src/topotask/__main__.py` | `topotask` CLI: run one pipeline from the command line                   |
 | `examples/`                | Implementation-specific nodes, pipeline, tests, Dockerfile (not shipped) |
-| `tests/`                   | Core executor / validation tests                                     |
-| `examples/tests/`          | Tests for the example nodes and pipeline                             |
+| `tests/`                   | Core executor / validation tests                                         |
+| `examples/tests/`          | Tests for the example nodes and pipeline                                 |
 
 ## What's validated at load time (before any GPU work)
 
@@ -253,7 +253,7 @@ uv publish               # or: twine upload dist/*
 ```
 
 Bump `version` in `pyproject.toml` for each release. The `examples/` directory
-is intentionally excluded from the wheel — only the `topo` package ships.
+is intentionally excluded from the wheel — only the `topotask` package ships.
 
 ## Known limits / next steps
 

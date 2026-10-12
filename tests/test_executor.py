@@ -3,7 +3,7 @@ import time
 
 import pytest
 
-from topo import Node, NodeParams, Pipeline, PipelineError, PipelineSpec, register
+from topotask import Node, NodeParams, Pipeline, PipelineError, PipelineSpec, register
 
 
 @register("t.pass")

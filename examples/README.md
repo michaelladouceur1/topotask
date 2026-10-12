@@ -1,7 +1,7 @@
-# topo examples
+# topotask examples
 
-Implementation-specific nodes and pipelines that show how to use `topo`. They
-are intentionally **not** part of the published `topo` package — copy what you
+Implementation-specific nodes and pipelines that show how to use `topotask`. They
+are intentionally **not** part of the published `topotask` package — copy what you
 need into your own project.
 
 | Node type               | File                      | What it shows                                        |
@@ -17,12 +17,12 @@ in comments where they belong.
 
 ## Registering the example nodes
 
-`topo` ships with no built-in nodes, so anything that constructs a `Pipeline`
+`topotask` ships with no built-in nodes, so anything that constructs a `Pipeline`
 must import the modules that define them. Two ways:
 
 ```bash
-# 1. Ad-hoc: list modules in TOPO_PLUGINS (comma-separated).
-TOPO_PLUGINS=examples.nodes python -m topo examples/configs/pipelines/plan_and_simulate.yaml \
+# 1. Ad-hoc: list modules in TOPOTASK_PLUGINS (comma-separated).
+TOPOTASK_PLUGINS=examples.nodes python -m topotask examples/configs/pipelines/plan_and_simulate.yaml \
     --inputs '{"goal":[0.3,0.2,0.4]}'
 
 # 2. In Python, just import them before building the pipeline.
@@ -44,13 +44,13 @@ pytest examples/tests
 ## Serve the example pipeline
 
 ```bash
-TOPO_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
-    python -m uvicorn topo.server:app
+TOPOTASK_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
+    python -m uvicorn topotask.server:app
 # POST /pipelines/plan_and_simulate/run {"inputs": {"goal": [0.3, 0.2, 0.4]}}
 ```
 
-> `TOPO_PLUGINS` resolves module names against `sys.path`, and the `python -m`
-> form puts the current directory on it. If you prefer the `uvicorn` / `topo`
+> `TOPOTASK_PLUGINS` resolves module names against `sys.path`, and the `python -m`
+> form puts the current directory on it. If you prefer the `uvicorn` / `topotask`
 > console scripts, add the repository root explicitly: `PYTHONPATH=. ...`.
 
 ## Container
@@ -59,5 +59,5 @@ TOPO_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
 from the repository root:
 
 ```bash
-docker build -f examples/Dockerfile -t topo-examples .
+docker build -f examples/Dockerfile -t topotask-examples .
 ```

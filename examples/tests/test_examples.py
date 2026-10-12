@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import examples.nodes  # noqa: F401  (importing registers the example node types)
-from topo import Pipeline, PipelineError, load_pipeline_spec
+from topotask import Pipeline, PipelineError, load_pipeline_spec
 
 CFG = Path(__file__).resolve().parents[1] / "configs" / "pipelines" / "plan_and_simulate.yaml"
 

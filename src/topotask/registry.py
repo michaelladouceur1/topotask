@@ -26,20 +26,20 @@ def get_node_class(type_name: str) -> type:
 
 
 def load_plugins() -> None:
-    """Import modules that register node types (`topo` ships with none built in).
+    """Import modules that register node types (`topotask` ships with none built in).
 
     Two optional mechanisms:
 
-    - ``TOPO_PLUGINS``: a comma-separated list of importable module names. Handy
+    - ``TOPOTASK_PLUGINS``: a comma-separated list of importable module names. Handy
       for local projects and examples that are not installed as a package.
-    - the ``topo.nodes`` entry-point group, the distributable path::
+    - the ``topotask.nodes`` entry-point group, the distributable path::
 
-          [project.entry-points."topo.nodes"]
+          [project.entry-points."topotask.nodes"]
           my_nodes = "my_pkg.nodes"
     """
-    for module in os.environ.get("TOPO_PLUGINS", "").split(","):
+    for module in os.environ.get("TOPOTASK_PLUGINS", "").split(","):
         module = module.strip()
         if module:
             importlib.import_module(module)
-    for ep in entry_points(group="topo.nodes"):
+    for ep in entry_points(group="topotask.nodes"):
         ep.load()

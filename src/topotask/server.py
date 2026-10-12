@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
         p.close()
 
 
-app = FastAPI(title="topo", lifespan=lifespan)
+app = FastAPI(title="topotask", lifespan=lifespan)
 
 
 class RunRequest(BaseModel):

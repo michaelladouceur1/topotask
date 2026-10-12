@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Literal
 
-from topo.node import Node, NodeParams
-from topo.registry import register
+from topotask.node import Node, NodeParams
+from topotask.registry import register
 
 
 @register("io.export_trajectory")
