@@ -1,6 +1,6 @@
 """Small DAG executor: graphlib for ordering, a thread pool for parallelism,
 `when:` gating for conditional branches. Threads are fine for GPU nodes because
-CUDA / Warp / PyTorch release the GIL while kernels run."""
+CUDA libraries release the GIL while kernels run."""
 from __future__ import annotations
 
 import threading

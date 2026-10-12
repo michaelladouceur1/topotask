@@ -21,8 +21,8 @@ specific is baked in.
   any expensive (GPU) work starts.
 - **Optional server.** FastAPI loads and warms every pipeline at startup.
 
-`topo` ships with **no built-in nodes**. Implementation-specific nodes (a cuRobo
-planner, a Warp simulator, scene I/O, ...) live in [`examples/`](examples) as a
+`topo` ships with **no built-in nodes**. Implementation-specific nodes (a motion
+planner, a simulator, scene I/O, ...) live in [`examples/`](examples) as a
 pattern to copy. See [`examples/README.md`](examples/README.md).
 
 ## Install
@@ -34,9 +34,11 @@ pip install topo
 Optional extras:
 
 ```bash
-pip install "topo[gpu]"    # warp-lang (cuRobo is installed from source)
 pip install "topo[dev]"    # pytest, httpx
 ```
+
+Anything GPU-related (a specific planner, simulator, etc.) is supplied by the
+packages that provide those nodes, not by `topo` itself.
 
 ## Quick start
 
@@ -119,18 +121,18 @@ Prefix a reference with `!` to negate a boolean:
 ```yaml
 nodes:
   plan:
-    type: planner.curobo
+    type: planner.plan
     inputs: {scene: scene.scene, goal: $input.goal}
 
-  export:                       # runs only when collision-free
-    type: io.export_trajectory
-    inputs: {trajectory: plan.trajectory}
-    when: simulate.collision_free
+  export:                       # runs only when the run succeeded
+    type: io.export
+    inputs: {result: plan.result}
+    when: simulate.ok
 
-  inflate:                      # runs only when NOT collision-free
-    type: scene.inflate_obstacles
+  fallback:                     # runs only when it did NOT
+    type: planner.retry
     inputs: {scene: scene.scene}
-    when: "!simulate.collision_free"
+    when: "!simulate.ok"
 ```
 
 ## Plugins
@@ -205,6 +207,6 @@ is intentionally excluded from the wheel — only the `topo` package ships.
 - **One run at a time per pipeline** (a lock), because nodes own GPU state
   (solver buffers, CUDA graphs). For concurrency, build N pipeline instances in
   a pool.
-- **Data stays in-process.** Pass torch tensors / `wp.array`s directly between
-  nodes; don't serialize them.
+- **Data stays in-process.** Pass large in-memory objects (tensors, arrays)
+  directly between nodes; don't serialize them.
 - Use Hydra instead of raw OmegaConf if you want config groups / multirun sweeps.

@@ -9,7 +9,9 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install -e ".[gpu]"
+RUN pip install -e .
+# GPU deps for these example nodes. Add cuRobo from source above if you need the planner.
+RUN pip install warp-lang
 COPY examples ./examples
 
 # Register the example nodes, then point the server at the example pipelines.

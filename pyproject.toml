@@ -46,7 +46,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-gpu = ["warp-lang"]          # cuRobo is installed from source; see examples/Dockerfile
 dev = ["pytest>=7", "httpx"]
 
 [project.scripts]
