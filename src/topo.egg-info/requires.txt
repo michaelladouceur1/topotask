@@ -1,0 +1,11 @@
+pydantic>=2.5
+omegaconf>=2.3
+fastapi>=0.110
+uvicorn>=0.27
+
+[dev]
+pytest
+httpx
+
+[gpu]
+warp-lang

@@ -1,0 +1,40 @@
+name: plan_and_simulate
+max_workers: 4
+
+nodes:
+  scene:
+    type: scene.load
+    params:
+      path: ${oc.env:SCENE_PATH,scenes/table.yaml}   # env interpolation via OmegaConf
+
+  plan:
+    type: planner.curobo
+    params: {robot: franka.yml, max_attempts: 4}
+    inputs:
+      scene: scene.scene
+      goal: $input.goal
+
+  simulate:
+    type: sim.warp
+    params: {min_clearance: 0.02}
+    inputs:
+      trajectory: plan.trajectory
+      scene: scene.scene
+
+  # --- if/else on a simulation output ---
+  export:                                  # runs only when collision-free
+    type: io.export_trajectory
+    params: {format: json}
+    inputs: {trajectory: plan.trajectory}
+    when: simulate.collision_free
+
+  inflate:                                 # runs only when NOT collision-free
+    type: scene.inflate_obstacles
+    params: {extra_padding: 0.05}
+    inputs: {scene: scene.scene}
+    when: "!simulate.collision_free"
+
+outputs:
+  sim: simulate.result
+  exported: export.payload      # null if skipped
+  suggested_scene: inflate.scene
