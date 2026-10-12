@@ -9,13 +9,22 @@ from .executor import Pipeline
 
 
 def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(prog="topo", description="Run a topo pipeline once.")
+    ap = argparse.ArgumentParser(
+        prog="topo",
+        description="Run a topo pipeline once.",
+        epilog="Overrides are OmegaConf dot-list assignments, e.g. "
+               "nodes.plan.params.max_attempts=8",
+    )
     ap.add_argument("config")
     ap.add_argument("--inputs", default="{}")
-    ap.add_argument("overrides", nargs="*", help="OmegaConf dotlist overrides")
-    a = ap.parse_args(argv)
+    # Collect overrides via parse_known_args so they can appear before or after
+    # --inputs (a `nargs="*"` positional cannot be mixed with an optional here).
+    a, extra = ap.parse_known_args(argv)
+    bad = [x for x in extra if "=" not in x]
+    if bad:
+        ap.error(f"unrecognized arguments: {' '.join(bad)}")
 
-    p = Pipeline(load_pipeline_spec(a.config, a.overrides))
+    p = Pipeline(load_pipeline_spec(a.config, extra))
     p.setup()
     try:
         print(json.dumps(p.run(json.loads(a.inputs)), indent=2))

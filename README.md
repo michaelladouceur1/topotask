@@ -95,6 +95,64 @@ python -m topo demo.yaml --inputs '{"x": 14}' nodes.d.params.factor=10
 # or, once installed:  topo demo.yaml --inputs '{"x": 14}'
 ```
 
+## Running the examples
+
+[`examples/`](examples) is a complete, runnable project to copy from:
+implementation-specific nodes (planner, simulator, scene I/O), a demo pipeline,
+its tests, and a Dockerfile. None of it is part of the `topo` wheel.
+
+Install the project with its dev dependencies from the repository root:
+
+```bash
+pip install -e ".[dev]"
+```
+
+The example nodes are not installed as a package, so `topo` must be told where
+to import them from. The `TOPO_PLUGINS` environment variable does that (see
+[Plugins](#plugins) below), and the `python -m ...` form puts the repository
+root on `sys.path`:
+
+```bash
+# Run the demo pipeline once. A reachable goal takes the "export" branch:
+TOPO_PLUGINS=examples.nodes python -m topo \
+    examples/configs/pipelines/plan_and_simulate.yaml \
+    --inputs '{"goal":[0.3,0.2,0.4]}'
+
+# A colliding goal takes the "inflate" fallback branch instead:
+TOPO_PLUGINS=examples.nodes python -m topo \
+    examples/configs/pipelines/plan_and_simulate.yaml \
+    --inputs '{"goal":[0.3,0.2,0.05]}'
+
+# Override any value with an OmegaConf dot-list:
+TOPO_PLUGINS=examples.nodes python -m topo \
+    examples/configs/pipelines/plan_and_simulate.yaml \
+    --inputs '{"goal":[0.3,0.2,0.4]}' nodes.simulate.params.min_clearance=0.5
+```
+
+Run the tests (`pytest` alone runs the core tests too):
+
+```bash
+pytest                 # everything
+pytest examples/tests  # just the examples
+```
+
+Serve the example pipelines with the FastAPI app:
+
+```bash
+TOPO_PLUGINS=examples.nodes PIPELINE_DIR=examples/configs/pipelines \
+    python -m uvicorn topo.server:app
+# GET  /pipelines
+# POST /pipelines/plan_and_simulate/run   {"inputs": {"goal": [0.3, 0.2, 0.4]}}
+```
+
+Build the example container (from the repository root):
+
+```bash
+docker build -f examples/Dockerfile -t topo-examples .
+```
+
+See [`examples/README.md`](examples/README.md) for a breakdown of each node.
+
 ## The node model
 
 ```python
@@ -146,11 +204,11 @@ my_nodes = "my_pkg.nodes"
 ```
 
 For projects that are not installed as a package (local scripts, the examples
-here), list modules in the `TOPO_PLUGINS` environment variable instead:
+here — see [Running the examples](#running-the-examples)), list modules in the
+`TOPO_PLUGINS` environment variable instead:
 
 ```bash
-TOPO_PLUGINS=examples.nodes python -m topo examples/configs/pipelines/plan_and_simulate.yaml \
-    --inputs '{"goal":[0.3,0.2,0.4]}'
+TOPO_PLUGINS=my_project.nodes python -m topo my_pipeline.yaml
 ```
 
 Importing a module that uses `@register(...)` is all it takes — registration is
