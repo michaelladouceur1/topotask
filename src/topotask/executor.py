@@ -37,10 +37,11 @@ class RunReport:
     """
     pipeline: str
     statuses: dict[str, NodeStatus] = field(default_factory=dict)
-    durations: dict[str, float] = field(default_factory=dict)
+    durations: dict[str, float] = field(default_factory=dict)   # per node, seconds
     errors: dict[str, str] = field(default_factory=dict)
     outputs: dict[str, Any] = field(default_factory=dict)
     ok: bool = True
+    duration: float = 0.0                                       # wall time of the whole run
 
 
 class Pipeline:
@@ -127,6 +128,7 @@ class Pipeline:
 
     def _execute(self, inputs: dict[str, Any]) -> RunReport:
         report = RunReport(pipeline=self.spec.name)
+        wall_start = time.perf_counter()
         results: dict[str, dict[str, Any]] = {INPUT: inputs}
         skipped: set[str] = set()
         sorter = TopologicalSorter(self.deps)
@@ -198,6 +200,7 @@ class Pipeline:
                 out[key] = None
         report.outputs = out
         report.ok = not failed
+        report.duration = time.perf_counter() - wall_start
         return report
 
     def _call(self, name: str, kwargs: dict[str, Any]) -> dict[str, Any]:

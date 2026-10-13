@@ -129,18 +129,22 @@ def test_to_dot_structure():
     dot = to_dot(SPEC)
     assert dot.startswith('digraph "demo"')
     assert '"a" [label="a\\nv.src"]' in dot
-    assert '"a" -> "b" [label="x"]' in dot            # data edge
+    assert '"a" -> "b" [xlabel="x"]' in dot           # data edge
     assert 'style=dashed' in dot                       # when gate edge
-    assert 'label="when y"' in dot
-    assert 'shape=oval' in dot                         # declared output sink
+    assert 'xlabel="when y"' in dot
+    assert 'constraint=false' in dot                   # gates don't force ranks
+    assert 'peripheries=2' in dot                      # declared output sink
+    assert "ordering=out" in dot                       # alignment
     assert dot.rstrip().endswith("}")
 
 
-def test_to_dot_results_colors_and_legend():
+def test_to_dot_results_timings_colors_and_legend():
     dot = to_dot(SPEC, report=_run(SPEC))
     assert 'fillcolor="#c8e6c9"' in dot                # succeeded = green
-    assert "cluster_legend" in dot
-    assert "legend_failed" in dot
+    assert 'label="a\\nv.src\\n' in dot                # per-node duration line
+    assert "total:" in dot                             # total run time
+    assert 'BGCOLOR="#c8e6c9"' in dot                  # legend swatch
+    assert "not run" in dot
 
 
 def test_to_dot_marks_skipped_dashed():
@@ -151,10 +155,11 @@ def test_to_dot_marks_skipped_dashed():
 
 def test_to_mermaid_structure_and_classes():
     mmd = to_mermaid(SPEC, report=_run(SPEC))
-    assert mmd.startswith("flowchart LR")
-    assert "-->|x|" in mmd
+    assert "flowchart LR" in mmd
+    assert "-->" in mmd and "|x|" in mmd
     assert "-.->|when y|" in mmd
     assert "classDef succeeded" in mmd
+    assert "title: demo (total" in mmd                # total in front matter
 
 
 # ---- JSON + rendering ------------------------------------------------------

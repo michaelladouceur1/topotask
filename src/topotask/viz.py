@@ -28,6 +28,7 @@ _STATUS_STYLE: dict[str, tuple[str, str]] = {
     "not_run": ("#ffffff", "#9e9e9e"),     # white
 }
 _STATUS_ORDER = ("succeeded", "failed", "skipped", "not_run")
+_STATUS_LABEL = {"not_run": "not run"}     # friendlier than the enum value
 
 
 def _q(value: Any) -> str:
@@ -35,11 +36,23 @@ def _q(value: Any) -> str:
     return '"' + str(value).replace('"', '\\"') + '"'
 
 
+def _html(value: Any) -> str:
+    return (str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+
+
 def _status(report: "RunReport | None", name: str) -> str | None:
     if report is None:
         return None
     st = report.statuses.get(name)
     return st.value if st is not None else "not_run"
+
+
+def _fmt_duration(seconds: float | None) -> str:
+    if seconds is None:
+        return "-"
+    if seconds < 1.0:
+        return f"{seconds * 1000:.1f} ms"
+    return f"{seconds:.2f} s"
 
 
 def _refs(spec: PipelineSpec) -> list[str]:
@@ -58,16 +71,59 @@ def _input_keys(spec: PipelineSpec) -> list[str]:
     return sorted(keys)
 
 
+def _node_extra(report: "RunReport | None", name: str) -> str | None:
+    """Third label line: the node's duration, or its status if it never ran."""
+    if report is None:
+        return None
+    if name in report.durations:
+        return _fmt_duration(report.durations[name])
+    return _STATUS_LABEL.get(_status(report, name), _status(report, name))
+
+
+def _graph_label(spec: PipelineSpec, report: "RunReport | None") -> str:
+    """HTML graph label: pipeline name, total time, and (with a report) a legend.
+
+    Keeping the legend in the graph label — rather than a cluster — means it
+    never perturbs node layout, so the structure and results images line up.
+    """
+    title = f"<B>{_html(spec.name)}</B>"
+    if report is None:
+        return f"<{title}>"
+
+    total = f"total: {_fmt_duration(report.duration)}"
+    cells = "".join(
+        f'<TD BGCOLOR="{_STATUS_STYLE[s][0]}" BORDER="1" CELLPADDING="3">'
+        f"{_html(_STATUS_LABEL.get(s, s))}</TD>"
+        for s in _STATUS_ORDER
+    )
+    return (
+        "<"
+        '<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2">'
+        f'<TR><TD ALIGN="CENTER">{title}</TD></TR>'
+        f'<TR><TD ALIGN="CENTER">{_html(total)}</TD></TR>'
+        f'<TR><TD ALIGN="CENTER"><TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3">'
+        f"<TR>{cells}</TR></TABLE></TD></TR>"
+        "</TABLE>"
+        ">"
+    )
+
+
 def to_dot(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
     """Graphviz DOT for ``spec``. Pass a :class:`RunReport` to colour nodes by
-    run status and add a legend."""
+    run status, show per-node and total timings, and add a legend."""
     lines = [
         f"digraph {_q(spec.name)} {{",
         "  rankdir=LR;",
-        f"  label={_q(spec.name)};",
+        "  ordering=out;",
+        "  ranksep=0.9;",
+        "  nodesep=0.45;",
+        "  splines=ortho;",
         "  labelloc=t;",
-        '  fontname="Helvetica";',
+        "  fontname=\"Helvetica\";",
+        f"  label={_graph_label(spec, report)};",
+        # Uniform boxes keep nodes aligned into even columns.
         '  node [shape=box, style="rounded,filled", fontname="Helvetica",'
+        ' fontsize=11, width=2.2, height=0.9, margin="0.12,0.08",'
         ' fillcolor="#e3f2fd", color="#1565c0"];',
         '  edge [fontname="Helvetica", fontsize=10, color="#546e7a"];',
     ]
@@ -76,10 +132,14 @@ def to_dot(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
     if keys:
         label = "Inputs\\n(" + ", ".join(keys) + ")"
         lines.append(f"  {_q(INPUT)} [label={_q(label)},"
-                     ' shape=note, fillcolor="#fff9c4", color="#f9a825"];')
+                     ' shape=box, fillcolor="#fff9c4", color="#f9a825"];')
 
     for name, ns in spec.nodes.items():
-        label = name + "\\n" + ns.type
+        label_lines = [name, ns.type]
+        extra = _node_extra(report, name)
+        if extra is not None:
+            label_lines.append(extra)
+        label = "\\n".join(label_lines)
         attrs = [f"label={_q(label)}"]
         st = _status(report, name)
         if st is not None:
@@ -93,33 +153,22 @@ def to_dot(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
         for kwarg, ref in ns.inputs.items():
             _, src, port = parse_ref(ref)
             tail = _q(INPUT) if src == INPUT else _q(src)
-            lines.append(f"  {tail} -> {_q(name)} [label={_q(kwarg)}];")
+            lines.append(f"  {tail} -> {_q(name)} [xlabel={_q(kwarg)}];")
         if ns.when:
             negate, src, port = parse_ref(ns.when)
             tail = _q(INPUT) if src == INPUT else _q(src)
             gate = f"when {'!' if negate else ''}{port}"
-            lines.append(f"  {tail} -> {_q(name)} [label={_q(gate)}, style=dashed,"
-                         ' color="#9e9e9e"];')
+            # Gates are control flow, not data flow: don't let them constrain ranks.
+            lines.append(f"  {tail} -> {_q(name)} [xlabel={_q(gate)}, style=dashed,"
+                         ' color="#9e9e9e", constraint=false];')
 
     for i, (key, ref) in enumerate(spec.outputs.items()):
         _, src, port = parse_ref(ref)
         tail = _q(INPUT) if src == INPUT else _q(src)
         oid = f"__out__{i}"
-        lines.append(f"  {_q(oid)} [label={_q(key)}, shape=oval,"
+        lines.append(f"  {_q(oid)} [label={_q(key)}, peripheries=2,"
                      ' fillcolor="#f3e5f5", color="#6a1b9a"];')
-        lines.append(f"  {tail} -> {_q(oid)} [style=dotted, label={_q(port)}];")
-
-    if report is not None:
-        lines.append("  subgraph cluster_legend {")
-        lines.append('    label="Run status"; fontsize=10; style=dashed; color="#bdbdbd";')
-        for st in _STATUS_ORDER:
-            fill, border = _STATUS_STYLE[st]
-            lines.append(f"    legend_{st} [label={_q(st)}, shape=box,"
-                         f' style="rounded,filled", fillcolor={_q(fill)},'
-                         f" color={_q(border)}];")
-        same = " ".join(f"legend_{st}" for st in _STATUS_ORDER)
-        lines.append(f"    {{rank=same; {same};}}")
-        lines.append("  }")
+        lines.append(f"  {tail} -> {_q(oid)} [style=dotted, xlabel={_q(port)}];")
 
     lines.append("}")
     return "\n".join(lines) + "\n"
@@ -128,13 +177,20 @@ def to_dot(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
 def to_mermaid(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
     """Mermaid flowchart for ``spec`` — handy in markdown/PRs without a renderer."""
     lines = ["flowchart LR"]
+    if report is not None:
+        lines = [f"---\ntitle: {spec.name} (total {_fmt_duration(report.duration)})\n---",
+                 "flowchart LR"]
     ids = {name: f"n{i}" for i, name in enumerate(spec.nodes)}
     keys = _input_keys(spec)
     if keys:
         lines.append(f'  inp["Inputs<br/>{"<br/>".join(keys)}"]')
 
     for name, ns in spec.nodes.items():
-        lines.append(f'  {ids[name]}["{name}<br/>{ns.type}"]')
+        parts = [name, ns.type]
+        extra = _node_extra(report, name)
+        if extra is not None:
+            parts.append(extra)
+        lines.append(f'  {ids[name]}["{"<br/>".join(parts)}"]')
 
     for name, ns in spec.nodes.items():
         for kwarg, ref in ns.inputs.items():
@@ -173,7 +229,7 @@ def render(spec: PipelineSpec, out_path: str | Path, report: "RunReport | None" 
     except ImportError as e:  # pragma: no cover - exercised only without the extra
         raise ImportError(
             "Rendering images needs the optional dependency; install it with: "
-            "pip install 'topotask[viz]'"
+            "pip install 'topotask[viz]' (or: uv sync --extra viz)"
         ) from e
 
     out_path = Path(out_path)
@@ -203,6 +259,7 @@ def write_report_json(report: "RunReport", path: str | Path) -> Path:
     data = {
         "pipeline": report.pipeline,
         "ok": report.ok,
+        "duration": report.duration,
         "statuses": {name: status.value for name, status in report.statuses.items()},
         "durations": report.durations,
         "errors": report.errors,

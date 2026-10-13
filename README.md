@@ -241,7 +241,8 @@ TOPOTASK_PLUGINS=examples.nodes python -m topotask \
     examples/configs/pipelines/plan_and_simulate.yaml \
     --inputs '{"goal":[0.3,0.2,0.4]}' --viz-dir out/
 # out/graph.png    structure: nodes, inputs, `when:` gates, declared outputs
-# out/results.png  the same graph, nodes coloured by status, with a legend
+# out/results.png  the same graph, nodes coloured by status, with per-node
+#                  timings on each node and the total run time in the title
 # out/report.json  the machine-readable report (statuses, durations, errors)
 ```
 

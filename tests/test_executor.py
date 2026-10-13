@@ -63,6 +63,8 @@ def test_run_report_records_statuses():
     assert report.ok
     assert report.statuses == {"a": NodeStatus.SUCCEEDED, "b": NodeStatus.SUCCEEDED}
     assert report.outputs == {"b": None}   # a returns x=None, b echoes it
+    assert report.duration >= 0.0
+    assert all(d >= 0.0 for d in report.durations.values())
 
 
 def test_run_report_on_failure_marks_downstream_not_run():
