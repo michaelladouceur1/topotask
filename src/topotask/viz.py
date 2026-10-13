@@ -30,6 +30,13 @@ _STATUS_STYLE: dict[str, tuple[str, str]] = {
 _STATUS_ORDER = ("succeeded", "failed", "skipped", "not_run")
 _STATUS_LABEL = {"not_run": "not run"}     # friendlier than the enum value
 
+# ``dot``/``mmd`` are text and need no renderer; the rest go through Graphviz.
+_TEXT_FORMATS = {"dot", "mmd"}
+_GRAPHVIZ_FORMATS = {
+    "bmp", "eps", "gif", "jpeg", "jpg", "json", "pdf", "plain",
+    "png", "ps", "svg", "tif", "tiff", "webp",
+}
+
 
 def _q(value: Any) -> str:
     """Quote a DOT string. Graphviz treats a literal ``\\n`` as a line break."""
@@ -220,10 +227,30 @@ def to_mermaid(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
 
 def render(spec: PipelineSpec, out_path: str | Path, report: "RunReport | None" = None,
            fmt: str | None = None) -> Path:
-    """Rasterize ``spec`` (optionally with run results) to ``out_path``.
+    """Write ``spec`` (optionally with run results) to ``out_path``.
 
-    Requires the optional ``graphviz`` package and the ``dot`` executable.
+    ``fmt`` defaults to the path's suffix, else ``png``. ``dot`` and ``mmd`` write
+    the text source directly and need no renderer; every other format rasterizes
+    via Graphviz (the optional ``graphviz`` package + the ``dot`` executable).
     """
+    out_path = Path(out_path)
+    fmt = (fmt or (out_path.suffix.lstrip(".") if out_path.suffix else "png")).lower()
+    if fmt == "mermaid":            # accept the friendly alias
+        fmt = "mmd"
+
+    if fmt in _TEXT_FORMATS:
+        text = (to_dot if fmt == "dot" else to_mermaid)(spec, report)
+        out_path = out_path.with_suffix("." + fmt)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(text)
+        return out_path
+
+    if fmt not in _GRAPHVIZ_FORMATS:
+        raise ValueError(
+            f"Unknown viz format {fmt!r}; use one of "
+            f"{sorted(_TEXT_FORMATS | _GRAPHVIZ_FORMATS)}."
+        )
+
     try:
         import graphviz
     except ImportError as e:  # pragma: no cover - exercised only without the extra
@@ -232,15 +259,8 @@ def render(spec: PipelineSpec, out_path: str | Path, report: "RunReport | None" 
             "pip install 'topotask[viz]' (or: uv sync --extra viz)"
         ) from e
 
-    out_path = Path(out_path)
-    if out_path.suffix:
-        fmt = fmt or out_path.suffix.lstrip(".")
-        stem = out_path.with_suffix("")
-    else:
-        fmt = fmt or "png"
-        out_path = out_path.with_suffix("." + fmt)
-        stem = out_path.with_suffix("")
-
+    out_path = out_path.with_suffix("." + fmt)
+    stem = out_path.with_suffix("")
     source = graphviz.Source(to_dot(spec, report), format=fmt)
     try:
         source.render(filename=str(stem), cleanup=True)

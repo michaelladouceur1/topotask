@@ -246,12 +246,17 @@ TOPOTASK_PLUGINS=examples.nodes python -m topotask \
 # out/report.json  the machine-readable report (statuses, durations, errors)
 ```
 
-`--viz-format` accepts `png` (default), `svg`, or `pdf`. Rendering images needs
-the optional extra:
+`--viz-format` accepts `png` (default), `svg`, `pdf`, `dot`, or `mmd`. `dot` and
+`mmd` write the text source (`graph.mmd`, `results.mmd`, …) and need **no**
+renderer; the image formats need the optional extra:
 
 ```bash
 pip install "topotask[viz]"    # the `graphviz` package + the Graphviz `dot` binary
 ```
+
+Analytics is best-effort: if a render fails (missing renderer, bad format) the
+run still completes, a warning goes to stderr, and a `.dot` source is written as
+a fallback. Only a node failure makes the command exit non-zero.
 
 The text emitters need no dependency, so they work everywhere:
 

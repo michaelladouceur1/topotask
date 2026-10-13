@@ -172,6 +172,50 @@ def test_write_report_json(tmp_path):
     assert data["statuses"]["b"] == "not_run"
 
 
+# ---- text formats need no renderer -----------------------------------------
+
+def test_render_dot_text(tmp_path):
+    out = render(SPEC, tmp_path / "graph.dot")
+    assert out.name == "graph.dot"
+    assert out.read_text().startswith('digraph "demo"')
+
+
+def test_render_mmd_text(tmp_path):
+    out = render(SPEC, tmp_path / "graph.mmd", report=_run(SPEC))
+    text = out.read_text()
+    assert "flowchart LR" in text
+    assert "title: demo (total" in text
+
+
+def test_render_mermaid_alias(tmp_path):
+    out = render(SPEC, tmp_path / "graph", fmt="mermaid")
+    assert out.name == "graph.mmd"
+
+
+def test_render_unknown_format(tmp_path):
+    with pytest.raises(ValueError, match="Unknown viz format"):
+        render(SPEC, tmp_path / "graph.xyz", fmt="xyz")
+
+
+def test_write_viz_falls_back_to_dot(tmp_path, monkeypatch):
+    """A render failure warns and drops a .dot fallback instead of raising."""
+    from topotask import viz
+    from topotask.__main__ import _write_viz
+
+    real_render = viz.render
+
+    def fail_images(spec, path, report=None, fmt=None):
+        if fmt != "dot":
+            raise RuntimeError("no renderer")
+        return real_render(spec, path, report=report, fmt=fmt)
+
+    monkeypatch.setattr(viz, "render", fail_images)
+    _write_viz(SPEC, tmp_path, "graph", "png")          # must not raise
+    fallback = tmp_path / "graph.dot"
+    assert fallback.exists()
+    assert fallback.read_text().startswith('digraph "demo"')
+
+
 @pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' not on PATH")
 def test_render_images(tmp_path):
     pytest.importorskip("graphviz")
