@@ -9,7 +9,7 @@ need into your own project.
 | `scene.load`            | `nodes/scene.py`          | A node that produces a scene from a path             |
 | `scene.inflate_obstacles` | `nodes/scene.py`        | A "fallback" branch node (`when: "!...."`)            |
 | `planner.curobo`        | `nodes/planning.py`       | A stateful GPU node: expensive `setup()`, cheap `run()` |
-| `sim.warp`              | `nodes/simulation.py`     | A multi-output node feeding an `if/else` branch       |
+| `sim.warp`              | `nodes/simulation.py`     | A multi-output node feeding multi-condition `when:` gates |
 | `io.export_trajectory`  | `nodes/io.py`             | A leaf node that serializes an upstream result        |
 
 The planner and simulator are **stubs**. The real cuRobo / Warp calls are left

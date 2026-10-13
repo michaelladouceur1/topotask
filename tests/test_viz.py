@@ -74,6 +74,17 @@ SKIP_SPEC = PipelineSpec.model_validate({
     "outputs": {"out": "sink.z"},
 })
 
+MULTI_SPEC = PipelineSpec.model_validate({
+    "name": "multi",
+    "nodes": {
+        "a": {"type": "v.src"},
+        "b": {"type": "v.sink", "inputs": {"x": "a.y"},
+              "when": ["a.y > 0", "!a.y > 100"]},
+        "c": {"type": "v.sink", "when": {"any": ["a.y == 1", "a.y == 2"]}},
+    },
+    "outputs": {"out": "b.z"},
+})
+
 
 def _run(spec):
     p = Pipeline(spec)
@@ -160,6 +171,28 @@ def test_to_mermaid_structure_and_classes():
     assert "-.->|when y|" in mmd
     assert "classDef succeeded" in mmd
     assert "title: demo (total" in mmd                # total in front matter
+
+
+def test_to_dot_multiple_gates_and_comparison():
+    dot = to_dot(MULTI_SPEC)
+    assert 'xlabel="when y > 0"' in dot
+    assert 'xlabel="when !y > 100"' in dot
+    assert 'xlabel="when y == 1"' in dot
+    assert 'xlabel="when y == 2"' in dot
+    assert dot.count("style=dashed") == 4              # one edge per condition
+
+
+def test_to_mermaid_multiple_gates():
+    mmd = to_mermaid(MULTI_SPEC)
+    assert "-.->|when y > 0|" in mmd
+    assert "-.->|when !y > 100|" in mmd
+    assert "-.->|when y == 1|" in mmd
+
+
+def test_multi_condition_gates_run():
+    r = _run(MULTI_SPEC)
+    assert r.statuses["b"] == NodeStatus.SUCCEEDED
+    assert r.statuses["c"] == NodeStatus.SUCCEEDED
 
 
 # ---- JSON + rendering ------------------------------------------------------

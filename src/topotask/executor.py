@@ -11,7 +11,8 @@ from enum import Enum
 from graphlib import CycleError, TopologicalSorter
 from typing import Any
 
-from .config import INPUT, PipelineSpec, parse_ref
+from .config import (INPUT, AllOf, AnyOf, Condition, Leaf, PipelineSpec,
+                     iter_condition_leaves, parse_ref)
 from .registry import get_node_class, load_plugins
 
 
@@ -64,24 +65,32 @@ class Pipeline:
 
     # ---- load-time validation -------------------------------------------------
     def _build_deps(self) -> dict[str, set[str]]:
-        deps: dict[str, set[str]] = {n: set() for n in self.spec.nodes}
+        self.data_deps: dict[str, set[str]] = {n: set() for n in self.spec.nodes}
+        self.cond_deps: dict[str, set[str]] = {n: set() for n in self.spec.nodes}
         for name, ns in self.spec.nodes.items():
-            refs = list(ns.inputs.values()) + ([ns.when] if ns.when else [])
-            for r in refs:
+            for r in ns.inputs.values():
                 _, src, _ = parse_ref(r)
                 if src != INPUT:
-                    deps[name].add(src)
-        return deps
+                    self.data_deps[name].add(src)
+            for leaf in iter_condition_leaves(ns.when):
+                if leaf.node != INPUT:
+                    self.cond_deps[name].add(leaf.node)
+        return {n: self.data_deps[n] | self.cond_deps[n] for n in self.spec.nodes}
 
     def _validate_ports(self) -> None:
         refs = [(n, r) for n, ns in self.spec.nodes.items()
-                for r in [*ns.inputs.values(), *([ns.when] if ns.when else [])]]
+                for r in ns.inputs.values()]
+        refs += [(n, f"{leaf.node}.{leaf.port}") for n, ns in self.spec.nodes.items()
+                 for leaf in iter_condition_leaves(ns.when)]
         refs += [("<outputs>", r) for r in self.spec.outputs.values()]
         for where, r in refs:
             _, src, port = parse_ref(r)
-            if src != INPUT and port not in self.nodes[src].outputs:
+            if src == INPUT:
+                continue
+            head = port.split(".", 1)[0]   # a.b.c addresses output 'a' then keys
+            if head not in self.nodes[src].outputs:
                 raise PipelineError(
-                    f"{where}: {r!r} -> node {src!r} has no output {port!r} "
+                    f"{where}: {r!r} -> node {src!r} has no output {head!r} "
                     f"(declared: {list(self.nodes[src].outputs)})")
 
     # ---- lifecycle ------------------------------------------------------------
@@ -121,10 +130,77 @@ class Pipeline:
         self.last_report = report
         return report
 
+    def _lookup_value(self, results: dict[str, dict[str, Any]], node: str, port: str) -> Any:
+        """Resolve ``node.port``; dots in ``port`` walk into a dict output."""
+        value = results[node]
+        if port in value:
+            return value[port]
+        for part in port.split("."):
+            value = value[part]
+        return value
+
     def _lookup(self, results: dict[str, dict[str, Any]], ref: str) -> Any:
         negate, src, port = parse_ref(ref)
-        val = results[src][port]
+        val = self._lookup_value(results, src, port)
         return (not val) if negate else val
+
+    @staticmethod
+    def _compare(left: Any, op: str, right: Any, node: str, port: str) -> bool:
+        if op == "==":
+            return left == right
+        if op == "!=":
+            return left != right
+        try:
+            if op == "<":
+                return left < right
+            if op == "<=":
+                return left <= right
+            if op == ">":
+                return left > right
+            return left >= right
+        except TypeError as e:
+            raise PipelineError(
+                f"Cannot compare {node}.{port} ({left!r}) {op} {right!r}: {e}") from None
+
+    def _eval_condition(self, cond: Condition | None,
+                        results: dict[str, dict[str, Any]],
+                        skipped: set[str]) -> bool | None:
+        """Three-valued gate evaluation: True, False, or None (unavailable).
+
+        A leaf whose source node was skipped (or never produced a value) is
+        *unknown*. ``all`` is True only if every child is True and False if any
+        is False; ``any`` is True if any child is True. Unknown propagates, so a
+        single unavailable gate skips the node, while an ``any`` can still be
+        satisfied by a sibling branch.
+        """
+        if cond is None:
+            return True
+        if isinstance(cond, AllOf):
+            unknown = False
+            for child in cond.conditions:
+                value = self._eval_condition(child, results, skipped)
+                if value is False:
+                    return False
+                unknown |= value is None
+            return None if unknown else True
+        if isinstance(cond, AnyOf):
+            unknown = False
+            for child in cond.conditions:
+                value = self._eval_condition(child, results, skipped)
+                if value is True:
+                    return True
+                unknown |= value is None
+            return None if unknown else False
+
+        leaf: Leaf = cond
+        if leaf.node != INPUT and (leaf.node in skipped or leaf.node not in results):
+            return None
+        value = self._lookup_value(results, leaf.node, leaf.port)
+        if leaf.op is None:
+            result: bool | None = bool(value)
+        else:
+            result = self._compare(value, leaf.op, leaf.value, leaf.node, leaf.port)
+        return (not result) if leaf.negate else result
 
     def _execute(self, inputs: dict[str, Any]) -> RunReport:
         report = RunReport(pipeline=self.spec.name)
@@ -142,8 +218,11 @@ class Pipeline:
             while sorter.is_active():
                 for name in sorter.get_ready():
                     ns = self.spec.nodes[name]
-                    # Skip if an upstream node was skipped, or the `when` gate is falsy.
-                    if self.deps[name] & skipped or (ns.when and not self._lookup(results, ns.when)):
+                    # Skip if a data input came from a skipped node; otherwise
+                    # evaluate the `when` gate (skipped gate sources count as
+                    # unavailable and fail an `all`, but not an `any`).
+                    gate_ok = self._eval_condition(ns.when, results, skipped) is True
+                    if self.data_deps[name] & skipped or not gate_ok:
                         skipped.add(name)
                         report.statuses[name] = NodeStatus.SKIPPED
                         sorter.done(name)

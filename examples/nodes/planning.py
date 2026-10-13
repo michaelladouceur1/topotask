@@ -9,7 +9,8 @@ class CuRoboPlanner(Node):
     class Params(NodeParams):
         robot: str = "franka.yml"
         max_attempts: int = 4
-    outputs = ("trajectory",)
+        num_steps: int = 5          # waypoints in the returned trajectory
+    outputs = ("trajectory", "steps")
 
     def setup(self):
         # Real version (expensive, so done ONCE here, not per request):
@@ -21,6 +22,6 @@ class CuRoboPlanner(Node):
     def run(self, scene, goal):
         # Real version: self.motion_gen.plan_single(start_state, Pose(...), plan_cfg),
         # keeping the result as torch tensors on the GPU.
-        n = 5
+        n = max(2, self.params.num_steps)
         traj = [[s + (g - s) * i / (n - 1) for s, g in zip(self.start, goal)] for i in range(n)]
-        return {"trajectory": traj}
+        return {"trajectory": traj, "steps": len(traj)}

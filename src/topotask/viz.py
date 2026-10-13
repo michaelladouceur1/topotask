@@ -15,7 +15,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from .config import INPUT, PipelineSpec, parse_ref
+from .config import INPUT, Leaf, PipelineSpec, iter_condition_leaves, parse_ref
 
 if TYPE_CHECKING:
     from .executor import RunReport
@@ -62,9 +62,18 @@ def _fmt_duration(seconds: float | None) -> str:
     return f"{seconds:.2f} s"
 
 
+def _leaf_gate(leaf: Leaf) -> str:
+    """Edge label for one condition, e.g. ``when !ok`` or ``when steps > 3``."""
+    label = f"when {'!' if leaf.negate else ''}{leaf.port}"
+    if leaf.op is not None:
+        label += f" {leaf.op} {leaf.value}"
+    return label
+
+
 def _refs(spec: PipelineSpec) -> list[str]:
     refs = [r for ns in spec.nodes.values() for r in ns.inputs.values()]
-    refs += [ns.when for ns in spec.nodes.values() if ns.when]
+    refs += [f"{leaf.node}.{leaf.port}" for ns in spec.nodes.values()
+             for leaf in iter_condition_leaves(ns.when)]
     refs += list(spec.outputs.values())
     return refs
 
@@ -161,13 +170,11 @@ def to_dot(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
             _, src, port = parse_ref(ref)
             tail = _q(INPUT) if src == INPUT else _q(src)
             lines.append(f"  {tail} -> {_q(name)} [xlabel={_q(kwarg)}];")
-        if ns.when:
-            negate, src, port = parse_ref(ns.when)
-            tail = _q(INPUT) if src == INPUT else _q(src)
-            gate = f"when {'!' if negate else ''}{port}"
+        for leaf in iter_condition_leaves(ns.when):
+            tail = _q(INPUT) if leaf.node == INPUT else _q(leaf.node)
             # Gates are control flow, not data flow: don't let them constrain ranks.
-            lines.append(f"  {tail} -> {_q(name)} [xlabel={_q(gate)}, style=dashed,"
-                         ' color="#9e9e9e", constraint=false];')
+            lines.append(f"  {tail} -> {_q(name)} [xlabel={_q(_leaf_gate(leaf))},"
+                         ' style=dashed, color="#9e9e9e", constraint=false];')
 
     for i, (key, ref) in enumerate(spec.outputs.items()):
         _, src, port = parse_ref(ref)
@@ -204,11 +211,9 @@ def to_mermaid(spec: PipelineSpec, report: "RunReport | None" = None) -> str:
             _, src, port = parse_ref(ref)
             tail = "inp" if src == INPUT else ids[src]
             lines.append(f"  {tail} -->|{kwarg}| {ids[name]}")
-        if ns.when:
-            negate, src, port = parse_ref(ns.when)
-            tail = "inp" if src == INPUT else ids[src]
-            gate = f"when {'!' if negate else ''}{port}"
-            lines.append(f"  {tail} -.->|{gate}| {ids[name]}")
+        for leaf in iter_condition_leaves(ns.when):
+            tail = "inp" if leaf.node == INPUT else ids[leaf.node]
+            lines.append(f"  {tail} -.->|{_leaf_gate(leaf)}| {ids[name]}")
 
     for i, (key, ref) in enumerate(spec.outputs.items()):
         _, src, port = parse_ref(ref)

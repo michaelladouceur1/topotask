@@ -31,6 +31,12 @@ def test_override_changes_param():
     assert out["exported"] is None   # clearance 0.2 < 0.5 now
 
 
+def test_multi_condition_gate_skips_on_short_plan():
+    # All conditions must hold: collision-free (yes) but steps 2 > 3 is false.
+    out = make(overrides=["nodes.plan.params.num_steps=2"]).run({"goal": [0.3, 0.2, 0.4]})
+    assert out["exported"] is None and out["suggested_scene"] is None
+
+
 def test_bad_param_rejected_at_load():
     with pytest.raises(Exception, match="max_attempt"):
         make(overrides=["nodes.plan.params.max_attempt=3"])  # typo -> extra="forbid"

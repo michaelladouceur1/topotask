@@ -15,7 +15,7 @@ specific is baked in.
   `outputs`, then implements `setup()` (once: load models, warm up kernels),
   `run()` (per request), and `teardown()` (release resources).
 - **A small DAG executor.** `graphlib` ordering plus a `ThreadPoolExecutor`, with
-  `when:` / `!when:` conditional branches.
+  multi-condition `when:` gates (AND lists, `any`/`all`, comparisons).
 - **Load-time validation.** Unknown node types, typo'd params, references to
   missing nodes, references to undeclared output ports, and cycles fail before
   any expensive (GPU) work starts.
@@ -193,6 +193,39 @@ nodes:
     inputs: {scene: scene.scene}
     when: "!simulate.ok"
 ```
+
+### `when:` conditions
+
+A `when:` gate accepts more than one condition. A **list means AND** — every
+condition must hold — and `{all: [...]}` / `{any: [...]}` make the logic
+explicit (they can nest). Conditions may come from one node or several, and a
+condition can compare an output against a literal with
+`==`, `!=`, `<`, `<=`, `>`, `>=`:
+
+```yaml
+  export:
+    type: io.export
+    inputs: {result: plan.result}
+    when:                       # list => ALL must hold
+      - simulate.collision_free # a truthy/boolean port
+      - plan.steps > 3          # a comparison against a literal
+      - "!simulate.aborted"     # negation still works
+
+  notify:                       # run if EITHER fallback fired
+    type: io.notify
+    when:
+      any:
+        - "!simulate.ok"
+        - plan.retries >= 2
+
+  # A dot-walks into a dict output: simulate.result.min_clearance
+```
+
+A leaf is `[!]<node>.<port> [op literal]`. Literals are numbers, `true`/`false`,
+`null`, or quoted strings. Unknown nodes, undeclared output ports, and malformed
+conditions fail at load time. When a gating node is skipped, an `all` gate fails
+(so its node is skipped too) while an `any` gate can still be satisfied by
+another branch.
 
 ## Plugins
 
