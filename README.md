@@ -161,7 +161,7 @@ class Node:
     outputs: tuple[str, ...]        # output ports declared at class level
 
     def setup(self) -> None: ...    # once per Pipeline, before any run()
-    def run(self, **inputs) -> dict[str, Any]: ...   # per request
+    def run(self, *args, **inputs) -> dict[str, Any]: ...   # per request
     def teardown(self) -> None: ... # release resources
 ```
 

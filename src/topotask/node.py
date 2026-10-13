@@ -24,7 +24,7 @@ class Node:
     def setup(self) -> None:
         """Load models, warm up kernels, allocate GPU buffers. Called once."""
 
-    def run(self, **inputs: Any) -> dict[str, Any]:
+    def run(self, *args: Any, **inputs: Any) -> dict[str, Any]:
         """Per-request work. Must return a dict with exactly the declared `outputs`."""
         raise NotImplementedError
 
