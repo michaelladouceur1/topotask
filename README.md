@@ -35,6 +35,7 @@ Optional extras:
 
 ```bash
 pip install "topotask[dev]"    # pytest, httpx
+pip install "topotask[viz]"    # graphviz, for rendering analytics images
 ```
 
 Anything GPU-related (a specific planner, simulator, etc.) is supplied by the
@@ -226,6 +227,47 @@ PIPELINE_DIR=configs/pipelines uvicorn topotask.server:app
 Every `*.yaml` in `PIPELINE_DIR` (default `configs/pipelines`) is loaded and
 warmed at startup; a bad config fails the process immediately.
 
+## Analytics / visual output
+
+Every run produces a `RunReport` — per-node status (`succeeded`, `failed`,
+`skipped`, `not_run`), durations, errors, and outputs. `run()` still raises on
+failure (and leaves the report on `p.last_report`); `run_report()` returns it
+without raising, so you can render analytics even for a failed run.
+
+Draw the pipeline's DAG, and optionally colour it by run results, from the CLI:
+
+```bash
+TOPOTASK_PLUGINS=examples.nodes python -m topotask \
+    examples/configs/pipelines/plan_and_simulate.yaml \
+    --inputs '{"goal":[0.3,0.2,0.4]}' --viz-dir out/
+# out/graph.png    structure: nodes, inputs, `when:` gates, declared outputs
+# out/results.png  the same graph, nodes coloured by status, with a legend
+# out/report.json  the machine-readable report (statuses, durations, errors)
+```
+
+`--viz-format` accepts `png` (default), `svg`, or `pdf`. Rendering images needs
+the optional extra:
+
+```bash
+pip install "topotask[viz]"    # the `graphviz` package + the Graphviz `dot` binary
+```
+
+The text emitters need no dependency, so they work everywhere:
+
+```python
+from topotask.viz import to_dot, to_mermaid
+print(to_dot(p.spec, report=p.last_report))     # Graphviz DOT
+print(to_mermaid(p.spec))                       # Mermaid, for markdown/PRs
+```
+
+Or from Python:
+
+```python
+from topotask.viz import render_all
+report = p.run_report({"goal": [0.3, 0.2, 0.4]})
+render_all(p.spec, "out/", report=report)       # graph.png + results.png + report.json
+```
+
 ## Layout
 
 | Path                       | Role                                                                     |
@@ -233,7 +275,8 @@ warmed at startup; a bad config fails the process immediately.
 | `src/topotask/config.py`   | Pydantic schema for pipeline YAML; OmegaConf loading + overrides         |
 | `src/topotask/node.py`     | `Node` base class: `Params`, declared `outputs`, lifecycle hooks         |
 | `src/topotask/registry.py` | `@register("type.name")` + entry-point / `TOPOTASK_PLUGINS` loading      |
-| `src/topotask/executor.py` | `graphlib` ordering + `ThreadPoolExecutor`; `when:` branches             |
+| `src/topotask/executor.py` | `graphlib` ordering + `ThreadPoolExecutor`; `when:` branches; `RunReport` |
+| `src/topotask/viz.py`      | DOT/Mermaid emitters + optional image rendering (the `[viz]` extra)      |
 | `src/topotask/server.py`   | FastAPI; loads + warms all pipelines at startup                          |
 | `src/topotask/__main__.py` | `topotask` CLI: run one pipeline from the command line                   |
 | `examples/`                | Implementation-specific nodes, pipeline, tests, Dockerfile (not shipped) |
